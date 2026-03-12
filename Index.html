@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>All-in-One QR Tool</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="qrcode.min.js"></script> <!-- Make sure to use a QRCode library supporting toCanvas -->
+<style>
+body { padding: 40px; text-align: center; }
+.qr-wrapper { display: inline-block; margin: 15px; position: relative; }
+.download-btn { margin-top: 5px; }
+.copy-btn { margin-left: 10px; }
+#iconPreview { max-width: 80px; max-height: 80px; display: block; margin: 10px auto; }
+#designerPreview { border: 1px solid #ccc; margin: 15px auto; display:block; }
+</style>
+</head>
+<body class="bg-light">
+
+<div class="container">
+<h1 class="mb-4">All-in-One QR Tool</h1>
+
+<ul class="nav nav-tabs mb-3" id="featureTabs" role="tablist">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#generator">QR Generator</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#designer">QR Designer</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#shortener">Link Shortener</button></li>
+</ul>
+
+<div class="tab-content">
+
+<!-- QR Generator -->
+<div class="tab-pane fade show active" id="generator">
+  <div class="mb-3">
+    <button class="btn btn-primary me-2" onclick="switchMode('single')">Single</button>
+    <button class="btn btn-primary" onclick="switchMode('multiple')">Multiple</button>
+  </div>
+  <div id="multipleControls" class="mb-3" style="display:none;">
+    <label for="countSelect">Number of URLs:</label>
+    <select id="countSelect" class="form-select d-inline-block w-auto" onchange="renderInputs()"></select>
+  </div>
+  <div id="inputs" class="mb-3"></div>
+  <button class="btn btn-primary mb-3" onclick="generateQRCodes()">Generate QR Code(s)</button>
+  <div id="qrcodes" class="d-flex flex-wrap justify-content-center"></div>
+</div>
+
+<!-- QR Designer -->
+<div class="tab-pane fade" id="designer">
+  <input type="text" id="designerInput" class="form-control mb-2 w-50 mx-auto" placeholder="Enter URL (optional if uploading QR)">
+  
+  <label class="form-label me-2">Size:</label>
+  <input type="number" id="designerSize" value="300" min="100" max="600" class="mb-2">
+  
+  <label class="form-label me-2">Color:</label>
+  <input type="color" id="designerColor" value="#000000">
+  
+  <label class="form-label ms-3 me-2">Background:</label>
+  <input type="color" id="designerBg" value="#ffffff">
+  
+  <label>Upload QR Code PNG (optional):</label>
+  <input type="file" id="qrUpload" accept="image/png" class="form-control mb-2 w-50 mx-auto">
+
+  <div class="mb-2">
+    <label>Select Icon:</label>
+    <select id="preIconSelect" class="form-select d-inline-block w-auto">
+      <option value="">None</option>
+      <option value="icons/instagram.png">Instagram</option>
+      <option value="icons/youtube.png">YouTube</option>
+      <option value="icons/snapchat.png">Snapchat</option>
+      <option value="icons/tiktok.png">TikTok</option>
+    </select>
+    <input type="file" id="uploadIcon" accept="image/*" class="ms-2">
+  </div>
+  <img id="iconPreview" src="" alt="Icon Preview" style="display:none">
+
+  <canvas id="designerPreview" width="300" height="300"></canvas>
+  <br>
+  <button class="btn btn-primary mb-3" onclick="downloadDesignerQR()">Download QR</button>
+</div>
+
+<!-- Link Shortener -->
+<div class="tab-pane fade" id="shortener">
+  <input type="text" id="linkInput" placeholder="Enter link to shorten" class="form-control d-inline-block w-50">
+  <button class="btn btn-primary ms-2" onclick="shortenLink()">Shorten</button>
+  <div id="shortLink" class="mt-3"></div>
+</div>
+
+</div>
+</div>
+
+<script>
+// QR Generator
+let mode='single';
+function switchMode(m){mode=m;document.getElementById("multipleControls").style.display=m==='multiple'?'inline-block':'none';renderInputs();clearQRCodes();}
+function renderInputs(){
+  const inputsDiv=document.getElementById("inputs"); inputsDiv.innerHTML="";
+  if(mode==='single'){let input=document.createElement("input"); input.type="text"; input.placeholder="Enter URL"; input.id="input0"; input.className="form-control mx-auto mb-2"; inputsDiv.appendChild(input);}
+  else{const count=parseInt(document.getElementById("countSelect").value); for(let i=0;i<count;i++){let input=document.createElement("input"); input.type="text"; input.placeholder=`Enter URL ${i+1}`; input.id=`input${i}`; input.className="form-control mx-auto mb-2"; inputsDiv.appendChild(input);}}
+}
+function clearQRCodes(){document.getElementById("qrcodes").innerHTML="";}
+function generateQRCodes(){
+  clearQRCodes(); const qrcodesDiv=document.getElementById("qrcodes");
+  const size=200, color="#000", bg="#fff"; 
+  const urls=[]; if(mode==='single'){const url=document.getElementById("input0").value.trim(); if(!url)return alert("Enter URL."); urls.push(url);}
+  else{const count=parseInt(document.getElementById("countSelect").value); for(let i=0;i<count;i++){const url=document.getElementById(`input${i}`).value.trim(); if(url)urls.push(url);} if(urls.length===0) return alert("Enter at least one URL.");}
+  urls.forEach(url=>{
+    const wrapper=document.createElement("div"); wrapper.className="qr-wrapper";
+    new QRCode(wrapper,{text:url,width:size,height:size,colorDark:color,colorLight:bg,correctLevel:QRCode.CorrectLevel.H});
+    const btn=document.createElement("button"); btn.textContent="Download"; btn.className="btn btn-primary download-btn"; btn.onclick=()=>downloadQR(wrapper,url);
+    wrapper.appendChild(btn); qrcodesDiv.appendChild(wrapper);
+  });
+}
+function downloadQR(wrapper,url){const img=wrapper.querySelector('img'); if(!img)return alert("QR not generated."); const link=document.createElement('a'); link.href=img.src; link.download=`QR_${url.replace(/[^a-z0-9]/gi,'_')}.png`; link.click();}
+window.onload=()=>{
+  const select=document.getElementById("countSelect"); for(let i=1;i<=10;i++){const option=document.createElement("option"); option.value=i; option.textContent=i; select.appendChild(option);}
+  renderInputs();
+};
+
+// QR Designer
+let selectedIcon=null;
+let uploadedQR=null;
+
+function updateDesignerPreview(){
+  const size=parseInt(document.getElementById("designerSize").value);
+  const color=document.getElementById("designerColor").value;
+  const bg=document.getElementById("designerBg").value;
+  const canvas=document.getElementById("designerPreview");
+  canvas.width=size; canvas.height=size;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,size,size);
+
+  if(uploadedQR){
+    ctx.drawImage(uploadedQR,0,0,size,size);
+    if(selectedIcon){const iconSize=size*0.5; ctx.drawImage(selectedIcon,(size-iconSize)/2,(size-iconSize)/2,iconSize,iconSize);}
+  } else {
+    const url=document.getElementById("designerInput").value.trim();
+    if(!url) return;
+    const tempCanvas=document.createElement("canvas");
+    tempCanvas.width=size; tempCanvas.height=size;
+    QRCode.toCanvas(tempCanvas, url, {width:size, color: {dark:color, light:bg}, errorCorrectionLevel:'H'}, function(err){
+      if(err) console.error(err);
+      ctx.drawImage(tempCanvas,0,0);
+      if(selectedIcon){const iconSize=size*0.5; ctx.drawImage(selectedIcon,(size-iconSize)/2,(size-iconSize)/2,iconSize,iconSize);}
+    });
+  }
+}
+
+// Icon upload
+document.getElementById('uploadIcon').onchange=function(e){
+  const reader=new FileReader();
+  reader.onload=function(evt){
+    selectedIcon=new Image();
+    selectedIcon.src=evt.target.result;
+    selectedIcon.onload=()=>{document.getElementById("iconPreview").src=selectedIcon.src; document.getElementById("iconPreview").style.display='block'; updateDesignerPreview();}
+  };
+  reader.readAsDataURL(e.target.files[0]);
+};
+
+// Preloaded icon select
+document.getElementById('preIconSelect').onchange=function(){
+  const val=this.value;
+  if(val){
+    selectedIcon=new Image();
+    selectedIcon.src=val;
+    selectedIcon.onload=()=>{document.getElementById("iconPreview").src=selectedIcon.src; document.getElementById("iconPreview").style.display='block'; updateDesignerPreview();}
+  } else {selectedIcon=null; document.getElementById("iconPreview").style.display='none'; updateDesignerPreview();}
+};
+
+// QR upload
+document.getElementById("qrUpload").onchange=function(e){
+  const reader=new FileReader();
+  reader.onload=function(evt){
+    uploadedQR=new Image();
+    uploadedQR.src=evt.target.result;
+    uploadedQR.onload=()=>updateDesignerPreview();
+  };
+  reader.readAsDataURL(e.target.files[0]);
+};
+
+// Listen for changes
+document.getElementById("designerInput").addEventListener("input",updateDesignerPreview);
+document.getElementById("designerSize").addEventListener("input",updateDesignerPreview);
+document.getElementById("designerColor").addEventListener("input",updateDesignerPreview);
+document.getElementById("designerBg").addEventListener("input",updateDesignerPreview);
+
+// Download Designer QR
+function downloadDesignerQR(){
+  const canvas=document.getElementById("designerPreview");
+  const link=document.createElement("a");
+  link.href=canvas.toDataURL();
+  link.download="designer_qr.png";
+  link.click();
+}
+
+// Link Shortener
+function shortenLink(){
+  const url=document.getElementById("linkInput").value.trim();
+  if(!url) return alert("Enter a URL.");
+  const short=`short.link/${Math.random().toString(36).substring(2,8)}`;
+  document.getElementById("shortLink").innerHTML=`Shortened: <a href="${url}" target="_blank">${short}</a> 
+  <button class="btn btn-secondary btn-sm copy-btn" onclick="navigator.clipboard.writeText('${short}')">Copy</button>`;
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
